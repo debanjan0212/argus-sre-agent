@@ -1,0 +1,9 @@
+tempo:
+  receivers:
+    otlp:
+      protocols:
+        grpc: {endpoint: "0.0.0.0:4317"}
+        http: {endpoint: "0.0.0.0:4318"}
+  metricsGenerator:
+    enabled: true   # service graphs power the service_dependencies tool
+    remoteWriteUrl: "http://kps-prometheus.monitoring:9090/api/v1/write"

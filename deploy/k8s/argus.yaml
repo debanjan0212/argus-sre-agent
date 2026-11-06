@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: Namespace
+metadata: {name: argus}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: argus, namespace: argus}
+---
+# Least privilege: read-only. Argus changes things only through Git pull requests.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata: {name: argus-read-only}
+rules:
+  - apiGroups: [""]
+    resources: [pods, events]
+    verbs: [get, list]
+  - apiGroups: [apps]
+    resources: [deployments, replicasets]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: {name: argus-read-only}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: argus-read-only}
+subjects:
+  - {kind: ServiceAccount, name: argus, namespace: argus}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: argus, namespace: argus}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: argus}}
+  template:
+    metadata: {labels: {app: argus}}
+    spec:
+      serviceAccountName: argus
+      securityContext: {runAsNonRoot: true, runAsUser: 10001}
+      containers:
+        - name: argus
+          image: argus-demo/argus:dev
+          imagePullPolicy: IfNotPresent
+          ports: [{name: http, containerPort: 8080}]
+          env:
+            - {name: ARGUS_BACKEND, value: http}
+            - {name: ARGUS_NAMESPACE, value: shop}
+            - {name: PROMETHEUS_URL, value: "http://kps-prometheus.monitoring:9090"}
+            - {name: LOKI_URL, value: "http://loki.monitoring:3100"}
+            - {name: TEMPO_URL, value: "http://tempo.monitoring:3200"}
+            - {name: ARGUS_AUDIT_LOG, value: /tmp/argus-audit.jsonl}
+          # Optional: model + GitOps PRs. kubectl -n argus create secret generic argus \
+          #   --from-literal=ARGUS_LLM=openai --from-literal=ARGUS_MODEL=... --from-literal=ARGUS_LLM_API_KEY=... \
+          #   --from-literal=ARGUS_GITHUB_REPO=you/gitops --from-literal=GITHUB_TOKEN=... --from-literal=ARGUS_GITOPS_DIR=/tmp/gitops
+          envFrom:
+            - secretRef: {name: argus, optional: true}
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 512Mi}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: argus, namespace: argus, labels: {app: argus}}
+spec:
+  selector: {app: argus}
+  ports: [{name: http, port: 8080, targetPort: http}]
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata: {name: argus, namespace: argus}
+spec:
+  selector: {matchLabels: {app: argus}}
+  endpoints: [{port: http, path: /metrics, interval: 30s}]

@@ -1,0 +1,5 @@
+.git
+.demo
+**/__pycache__
+evals
+tests

@@ -1,0 +1,8 @@
+# The desired state Argo CD / Flux syncs. Argus proposes fixes as PRs against these files.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- namespace.yaml
+- apps/frontend/deployment.yaml
+- apps/checkout/deployment.yaml
+- apps/payments/deployment.yaml

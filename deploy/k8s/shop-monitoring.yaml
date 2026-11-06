@@ -1,0 +1,49 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata: {name: shop, namespace: shop}
+spec:
+  selector:
+    matchLabels: {app.kubernetes.io/part-of: shop}
+  endpoints:
+    - {port: http, path: /metrics, interval: 15s, honorLabels: true}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata: {name: shop-slo-alerts, namespace: shop}
+spec:
+  groups:
+    - name: shop.rules
+      rules:
+        - alert: HighErrorRate
+          expr: |
+            sum by (namespace, service) (rate(http_server_request_duration_seconds_count{namespace="shop",http_response_status_code=~"5.."}[5m]))
+              / sum by (namespace, service) (rate(http_server_request_duration_seconds_count{namespace="shop"}[5m])) > 0.05
+          for: 2m
+          labels: {severity: page}
+          annotations: {summary: "{{ $labels.service }} 5xx error rate is {{ $value | humanizePercentage }}"}
+        - alert: HighLatencyP95
+          expr: |
+            histogram_quantile(0.95, sum by (le, namespace, service) (rate(http_server_request_duration_seconds_bucket{namespace="shop"}[5m]))) > 1
+          for: 5m
+          labels: {severity: page}
+          annotations: {summary: "{{ $labels.service }} p95 latency is {{ $value | humanizeDuration }}"}
+        - alert: PodRestarting
+          expr: |
+            sum by (namespace, service) (label_replace(increase(kube_pod_container_status_restarts_total{namespace="shop"}[15m]), "service", "$1", "container", "(.*)")) > 2
+          labels: {severity: page}
+          annotations: {summary: "{{ $labels.service }} restarted {{ $value }} times in 15 minutes"}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: loadgen, namespace: shop}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: loadgen}}
+  template:
+    metadata: {labels: {app: loadgen}}
+    spec:
+      containers:
+        - name: loadgen
+          image: curlimages/curl:8.11.1
+          command: ["sh", "-c", "while true; do curl -s -o /dev/null http://frontend:8080/; sleep 0.05; done"]
+          resources: {limits: {cpu: 100m, memory: 32Mi}}

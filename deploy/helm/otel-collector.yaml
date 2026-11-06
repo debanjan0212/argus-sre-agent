@@ -1,0 +1,14 @@
+# Ships container logs to Loki over OTLP. Vendor-neutral: point the exporter at any OTLP backend.
+mode: daemonset
+image: {repository: otel/opentelemetry-collector-k8s}
+presets:
+  logsCollection: {enabled: true}
+  kubernetesAttributes: {enabled: true}
+config:
+  exporters:
+    otlphttp/loki: {endpoint: "http://loki.monitoring:3100/otlp"}
+  service:
+    pipelines:
+      logs:
+        processors: [k8sattributes, memory_limiter, batch]
+        exporters: [otlphttp/loki]

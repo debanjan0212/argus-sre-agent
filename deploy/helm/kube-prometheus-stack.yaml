@@ -1,0 +1,27 @@
+fullnameOverride: kps
+prometheus:
+  prometheusSpec:
+    enableRemoteWriteReceiver: true          # Tempo writes service-graph metrics here
+    serviceMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+alertmanager:
+  config:
+    route:
+      receiver: argus
+      group_by: [alertname, service]
+      group_wait: 30s
+      repeat_interval: 30m
+      routes:
+        - receiver: "null"
+          matchers: ['alertname =~ "Watchdog|InfoInhibitor"']
+    receivers:
+      - name: "null"
+      - name: argus
+        webhook_configs:
+          - url: http://argus.argus.svc:8080/alertmanager
+            send_resolved: false
+grafana:
+  adminPassword: admin   # local demo only
+  additionalDataSources:
+    - {name: Loki, type: loki, uid: loki, url: "http://loki.monitoring:3100"}
+    - {name: Tempo, type: tempo, uid: tempo, url: "http://tempo.monitoring:3200"}
