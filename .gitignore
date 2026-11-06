@@ -5,3 +5,4 @@ __pycache__/
 .demo/
 eval-results.json
 *.jsonl
+.venv/
