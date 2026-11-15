@@ -8,9 +8,10 @@ import yaml
 from mcp.server.mcpserver import MCPServer
 from mcp_types import ToolAnnotations
 
-from argus.agent import investigate, parse_report
+from argus.agent import incident_id, investigate, parse_report
 from argus.guardrails import Guardrails, to_mi
 from argus.llm import Reply, ToolCall
+from argus.net import open_http
 from argus.remediation import propose_change
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -136,3 +137,19 @@ def test_model_outage_falls_back_to_runbook(monkeypatch):
         "params": {"memory": "512Mi"},
         "rationale": result["remediation"]["rationale"],
     }
+
+
+def test_incident_id_is_stable():
+    # The id names the Git branch and the report. It must not change when the hash call is touched.
+    alert = {"labels": {"alertname": "HighErrorRate", "service": "frontend", "namespace": "shop", "severity": "page"}}
+    assert incident_id(alert) == "higherrorrate-03db5b4a"
+
+
+def test_only_http_urls_are_opened():
+    import urllib.request
+
+    import pytest
+
+    for url in ("file:///etc/passwd", "ftp://example.com/x"):
+        with pytest.raises(ValueError, match="only http and https"):
+            open_http(urllib.request.Request(url), timeout=1)

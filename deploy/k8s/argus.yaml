@@ -35,11 +35,17 @@ spec:
     metadata: {labels: {app: argus}}
     spec:
       serviceAccountName: argus
-      securityContext: {runAsNonRoot: true, runAsUser: 10001}
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
       containers:
         - name: argus
           image: argus-demo/argus:dev
           imagePullPolicy: IfNotPresent
+          # Nothing in the container can gain privileges or write outside /tmp.
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]  # audit log, HOME and the GitOps clone live here
           ports: [{name: http, containerPort: 8080}]
           env:
             - {name: ARGUS_BACKEND, value: http}
@@ -58,6 +64,7 @@ spec:
           resources:
             requests: {cpu: 50m, memory: 128Mi}
             limits: {cpu: 500m, memory: 512Mi}
+      volumes: [{name: tmp, emptyDir: {}}]
 ---
 apiVersion: v1
 kind: Service

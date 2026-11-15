@@ -21,6 +21,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from argus.agent import investigate, to_markdown
 from argus.guardrails import Guardrails
 from argus.llm import load_llm
+from argus.net import open_http
 from argus.remediation import propose_change
 
 DEDUPE_SECONDS = int(os.getenv("ARGUS_DEDUPE_SECONDS", "1800"))
@@ -43,7 +44,7 @@ def handle_alert(alert: dict) -> None:
             req = urllib.request.Request(
                 hook, data=json.dumps({"text": to_markdown(result)}).encode(), headers={"Content-Type": "application/json"}
             )
-            urllib.request.urlopen(req, timeout=10).close()
+            open_http(req, timeout=10).close()
         status = "ok"
     except Exception as exc:  # noqa: BLE001 - a failed investigation must not kill the receiver
         result, status = {"incident_id": alert.get("fingerprint", "?"), "error": str(exc)}, "error"
@@ -105,8 +106,11 @@ def main():
     if repo and token and gitops and not os.path.isdir(gitops):  # in-cluster: clone the GitOps repo once
         subprocess.run(["git", "clone", f"https://x-access-token:{token}@github.com/{repo}.git", gitops], check=True)
     port = int(os.getenv("ARGUS_PORT", "8080"))
-    print(f"argus webhook listening on :{port}")
-    ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()
+    # All interfaces by default: this runs in a pod and Alertmanager reaches it through the Service.
+    # Set ARGUS_HOST=127.0.0.1 to keep it local.
+    host = os.getenv("ARGUS_HOST", "0.0.0.0")  # nosec B104
+    print(f"argus webhook listening on {host}:{port}")
+    ThreadingHTTPServer((host, port), Handler).serve_forever()
 
 
 if __name__ == "__main__":

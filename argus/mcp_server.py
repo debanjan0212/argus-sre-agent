@@ -4,7 +4,11 @@ Task-shaped, read-only tools over Prometheus, Loki, Tempo and Kubernetes. Any MC
 it (Claude, Cursor, your own agent), and Argus can use any other MCP server next to it.
 
 Run:  python -m argus.mcp_server            (stdio)
-      python -m argus.mcp_server --http     (streamable HTTP on :8765/mcp)
+      python -m argus.mcp_server --http     (streamable HTTP on 127.0.0.1:8765/mcp)
+
+Over HTTP the server listens on localhost only. To expose it, for example from a container,
+set ARGUS_MCP_HOST=0.0.0.0 and put your own authentication in front of it: the tools are
+read-only, but they still read your logs and metrics.
 """
 
 from __future__ import annotations
@@ -106,7 +110,8 @@ def promql(query: str) -> dict:
 
 def main():
     if "--http" in sys.argv:
-        server.run(transport="streamable-http", host="0.0.0.0", port=int(os.getenv("ARGUS_MCP_PORT", "8765")))
+        host = os.getenv("ARGUS_MCP_HOST", "127.0.0.1")
+        server.run(transport="streamable-http", host=host, port=int(os.getenv("ARGUS_MCP_PORT", "8765")))
     else:
         server.run()
 

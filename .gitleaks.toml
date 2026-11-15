@@ -1,0 +1,12 @@
+# gitleaks runs over the full history in .github/workflows/security.yml.
+# Everything is scanned with the default rules. The one exception is listed
+# here by its exact value, with the reason, so nothing else can hide behind it.
+title = "argus-sre-agent"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Made-up key in an eval log line, used to test that secrets are redacted before the model sees them. It was never a real credential. The fixture now uses a value shaped like no provider's key; this entry covers the old value in history."
+regexTarget = "match"
+regexes = ['''sk_live_51HxYzQ2abc''']

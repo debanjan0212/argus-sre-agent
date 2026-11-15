@@ -21,6 +21,8 @@ from datetime import UTC, datetime
 
 import yaml
 
+from argus.net import open_http
+
 _ERROR_RE = re.compile(r"(?i)\b(error|exception|fatal|panic|timeout|refused|killed)\b")
 _NORMALIZERS = [
     (re.compile(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b", re.IGNORECASE), "<uuid>"),
@@ -108,7 +110,7 @@ class HttpBackend:
     @staticmethod
     def _get_json(url: str, params: dict) -> dict:
         req = urllib.request.Request(f"{url}?{urllib.parse.urlencode(params)}", headers={"Accept": "application/json"})
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with open_http(req, timeout=15) as resp:
             return json.load(resp)
 
     def _prom(self, query: str) -> list:
