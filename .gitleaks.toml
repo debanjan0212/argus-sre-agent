@@ -9,4 +9,5 @@ useDefault = true
 [[allowlists]]
 description = "Made-up key in an eval log line, used to test that secrets are redacted before the model sees them. It was never a real credential. The fixture now uses a value shaped like no provider's key; this entry covers the old value in history."
 regexTarget = "match"
-regexes = ['''sk_live_51HxYzQ2abc''']
+# Written with a character class so this file does not itself contain the string scanners look for.
+regexes = ['''sk_live_51HxYz[Q]2abc''']
