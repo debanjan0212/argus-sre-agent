@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.15-slim
 # kubectl is checked against the checksum Kubernetes publishes next to it, so a tampered or
 # truncated download fails the build instead of ending up in the image.
 RUN apt-get update && apt-get install -y --no-install-recommends curl git ca-certificates \
