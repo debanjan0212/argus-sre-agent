@@ -14,6 +14,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 
 from argus.guardrails import to_mi
+from argus.net import open_http
 
 
 @dataclass
@@ -41,7 +42,7 @@ class OpenAICompatLLM:
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
         req = urllib.request.Request(self.url, data=json.dumps(body).encode(), headers=headers)
-        with urllib.request.urlopen(req, timeout=120) as resp:
+        with open_http(req, timeout=120) as resp:
             return json.load(resp)
 
     async def complete(self, messages: list[dict], tools: list[dict]) -> Reply:

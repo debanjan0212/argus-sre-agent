@@ -41,5 +41,5 @@ data:
       - '{"level": "error", "message": "KeyError: ''currency'' in POST /checkout (order_id=8812)"}'
       - '{"level": "error", "message": "KeyError: ''currency'' in POST /checkout (order_id=8813)"}'
       - '{"level": "error", "message": "KeyError: ''currency'' in POST /checkout (order_id=8820)"}'
-      - '{"level": "error", "message": "payment client init failed api_key=sk_live_51HxYzQ2abc"}'
+      - '{"level": "error", "message": "payment client init failed api_key=demo-key-not-a-real-one"}'
       - '{"level": "info", "message": "GET /healthz 200"}'

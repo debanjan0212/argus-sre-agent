@@ -62,7 +62,9 @@ def parse_report(text: str | None) -> dict | None:
 
 def incident_id(alert: dict) -> str:
     labels = json.dumps(alert.get("labels", {}), sort_keys=True)
-    return f"{alert.get('labels', {}).get('alertname', 'alert').lower()}-{hashlib.sha1(labels.encode()).hexdigest()[:8]}"
+    # SHA-1 only shortens the labels into a readable id; nothing here relies on it being collision-proof.
+    digest = hashlib.sha1(labels.encode(), usedforsecurity=False).hexdigest()[:8]
+    return f"{alert.get('labels', {}).get('alertname', 'alert').lower()}-{digest}"
 
 
 async def investigate(alert: dict, llm, guard: Guardrails, servers: list | None = None) -> dict:

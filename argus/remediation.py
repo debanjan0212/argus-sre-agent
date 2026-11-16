@@ -13,6 +13,7 @@ from pathlib import Path
 import yaml
 
 from argus.agent import to_markdown
+from argus.net import open_http
 
 CHANGES = {"rollback_image", "increase_memory_limit", "scale_replicas"}
 
@@ -88,7 +89,7 @@ def propose_change(result: dict, repo_dir: str) -> dict:
             data=json.dumps(body).encode(),
             headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
         )
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with open_http(req, timeout=30) as resp:
             return {"status": "pr-opened", "branch": branch, "url": json.load(resp)["html_url"], "diff": diff}
     finally:
         _git(repo_dir, "checkout", base)

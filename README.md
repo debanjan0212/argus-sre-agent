@@ -4,6 +4,7 @@
 Argus never touches the cluster. It reads through read-only MCP tools, and every change goes through Git and a human review.
 
 ![ci](https://github.com/debanjan0212/argus-sre-agent/actions/workflows/ci.yml/badge.svg)
+![security](https://github.com/debanjan0212/argus-sre-agent/actions/workflows/security.yml/badge.svg)
 
 ```text
 $ make demo
@@ -150,7 +151,8 @@ Create an incoming webhook in Slack or Google Chat and set `ARGUS_NOTIFY_WEBHOOK
 | `ARGUS_GITOPS_DIR`, `ARGUS_GITHUB_REPO`, `GITHUB_TOKEN` | | GitOps commits and pull requests (see step 5) |
 | `ARGUS_NOTIFY_WEBHOOK` | | Slack or Google Chat incoming webhook |
 | `ARGUS_AUDIT_LOG` | | file path for the JSONL audit log of every tool call |
-| `ARGUS_PORT` | `8080` | HTTP port for the webhook, `/reports` and `/metrics` |
+| `ARGUS_PORT`, `ARGUS_HOST` | `8080`, `0.0.0.0` | HTTP port and address for the webhook, `/reports` and `/metrics`. Set `ARGUS_HOST=127.0.0.1` to keep it local. |
+| `ARGUS_MCP_PORT`, `ARGUS_MCP_HOST` | `8765`, `127.0.0.1` | where `argus-mcp --http` listens. It is local-only unless you set `ARGUS_MCP_HOST=0.0.0.0`. |
 
 ### Use its MCP server from Claude, Cursor or any MCP client
 
