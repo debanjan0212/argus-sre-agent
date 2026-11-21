@@ -139,6 +139,22 @@ def test_model_outage_falls_back_to_runbook(monkeypatch):
     }
 
 
+def test_incident_id_is_stable():
+    # The id names the Git branch and the report. It must not change when the hash call is touched.
+    alert = {"labels": {"alertname": "HighErrorRate", "service": "frontend", "namespace": "shop", "severity": "page"}}
+    assert incident_id(alert) == "higherrorrate-03db5b4a"
+
+
+def test_only_http_urls_are_opened():
+    import urllib.request
+
+    import pytest
+
+    for url in ("file:///etc/passwd", "ftp://example.com/x"):
+        with pytest.raises(ValueError, match="only http and https"):
+            open_http(urllib.request.Request(url), timeout=1)
+
+
 def test_the_github_token_never_appears_in_a_git_command_or_url(monkeypatch, tmp_path):
     import base64
 
@@ -181,19 +197,3 @@ def test_git_runs_without_a_token_too(monkeypatch):
     monkeypatch.delenv("GITHUB_TOKEN", raising=False)
     monkeypatch.delenv("GIT_CONFIG_COUNT", raising=False)
     assert "GIT_CONFIG_COUNT" not in remediation.git_env()
-
-
-def test_incident_id_is_stable():
-    # The id names the Git branch and the report. It must not change when the hash call is touched.
-    alert = {"labels": {"alertname": "HighErrorRate", "service": "frontend", "namespace": "shop", "severity": "page"}}
-    assert incident_id(alert) == "higherrorrate-03db5b4a"
-
-
-def test_only_http_urls_are_opened():
-    import urllib.request
-
-    import pytest
-
-    for url in ("file:///etc/passwd", "ftp://example.com/x"):
-        with pytest.raises(ValueError, match="only http and https"):
-            open_http(urllib.request.Request(url), timeout=1)
