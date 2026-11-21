@@ -88,6 +88,8 @@ make eval      # the same five incidents, now investigated by the model
 
 If the model API fails in the middle of an incident, Argus falls back to runbook mode by itself.
 
+Runbook mode does not guess between two causes. If a release went out in the last hour and the logs also show a starved database connection pool, it reports both and escalates to a person, with no rollback proposed.
+
 ### Step 4: run it on your own cluster (EKS, GKE, AKS, bare metal)
 
 Check these first:

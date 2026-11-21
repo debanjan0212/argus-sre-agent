@@ -219,6 +219,9 @@ class RunbookLLM:
                 "Raise the limit to stop the crash loop now; check for a leak before the next release.",
             )
 
+        # The logs point at a dependency: requests are waiting on a database or its connection pool.
+        pool = any(re.search(r"(?i)pool|connection|database|deadlock", p) for p in patterns) and cpu < 70
+
         fresh = len(rollouts) >= 2 and rollouts[-1].get("age_min") is not None and rollouts[-1]["age_min"] <= 60
         if fresh and (err >= max(0.05, 5 * base) or (lbase and lat >= 2 * lbase)):
             new, old = rollouts[-1], rollouts[-2]
@@ -226,16 +229,28 @@ class RunbookLLM:
                 f"{s}: revision {new.get('revision')} ({new.get('image')}) rolled out "
                 f"{new.get('age_min')} min ago, right before the degradation"
             )
+            if pool:
+                # A recent release and a starved connection pool both explain this. A rollback fixes only one
+                # of them, and a release is "recent" for a whole hour, so a rule must not pick. A person does.
+                return report(
+                    "unknown",
+                    f"two causes fit: release {new.get('image')} went out {new.get('age_min')} min ago, "
+                    "and requests are waiting on an exhausted database connection pool",
+                    0.5,
+                    "escalate",
+                    rationale=f"Check database load first. Rolling back to {old.get('image')} only helps "
+                    "if the release changed how connections are used.",
+                )
             return report(
                 "bad_deploy",
                 f"release {new.get('image')} introduced the regression",
                 0.9 if patterns else 0.75,
                 "rollback_image",
                 {"image": old.get("image")},
-                f"Roll back to {old.get('image')}, the last revision with healthy signals.",
+                f"Roll back to {old.get('image')}, the previous revision.",
             )
 
-        if any(re.search(r"(?i)pool|connection|database|deadlock", p) for p in patterns) and cpu < 70:
+        if pool:
             return report(
                 "dependency_failure",
                 "requests are waiting on an exhausted database connection pool",
