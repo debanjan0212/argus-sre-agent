@@ -20,6 +20,8 @@ SECRET_PATTERNS = [
     (re.compile(r"(?i)\b(bearer)\s+[\w.~+/-]{16,}=*"), r"\1 <token>"),
     (re.compile(r"""(?i)\b(password|passwd|secret|api[_-]?key|token)\b("?\s*[=:]\s*"?)[^\s"',;}]+"""), r"\1\2<redacted>"),
     (re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]+?-----END [A-Z ]*PRIVATE KEY-----"), "<private-key>"),
+    # scheme://user:password@host, as in a database connection string; must run before the e-mail pattern
+    (re.compile(r"(?i)\b([a-z][a-z0-9+.-]*://[^\s/:@]*):[^\s/@]+@"), r"\1:<redacted>@"),
     (re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.]+\b"), "<email>"),
 ]
 INJECTION_RE = re.compile(

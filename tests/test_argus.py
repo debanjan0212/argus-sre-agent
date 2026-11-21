@@ -139,6 +139,52 @@ def test_model_outage_falls_back_to_runbook(monkeypatch):
     }
 
 
+def _runbook(scenario: dict, tmp_path, monkeypatch) -> dict:
+    """Run one scenario in runbook mode and return the investigation result."""
+    from argus.llm import RunbookLLM
+
+    path = tmp_path / "scenario.yaml"
+    path.write_text(yaml.safe_dump(scenario))
+    monkeypatch.setenv("ARGUS_BACKEND", "fixture")
+    monkeypatch.setenv("ARGUS_FIXTURE", str(path))
+    return asyncio.run(investigate(scenario["alert"], RunbookLLM(), Guardrails()))
+
+
+def test_a_recent_release_does_not_hide_a_starved_connection_pool(tmp_path, monkeypatch):
+    """A release in the last hour plus a pool timeout in the logs is two possible causes, so a person decides."""
+    scenario = yaml.safe_load((ROOT / "evals/scenarios/04-db-pool-exhaustion.yaml").read_text())
+    plain = _runbook(scenario, tmp_path, monkeypatch)
+    assert plain["report"]["category"] == "dependency_failure"
+
+    # the same incident, with an unrelated release 30 minutes earlier
+    scenario["data"].setdefault("rollouts", {})["checkout"] = [
+        {"revision": 7, "image": "argus-demo/shop:1.3.1", "age_min": 2880},
+        {"revision": 8, "image": "argus-demo/shop:1.3.2", "age_min": 30},
+    ]
+    mixed = _runbook(scenario, tmp_path, monkeypatch)
+    assert mixed["report"]["category"] == "unknown"
+    assert mixed["remediation"]["action"] == "escalate"
+    assert mixed["report"]["confidence"] < 0.7  # below the policy minimum: no automatic change
+    assert "1.3.2" in mixed["report"]["root_cause"] and "connection pool" in mixed["report"]["root_cause"]
+
+
+def test_a_bad_release_on_its_own_is_still_rolled_back(tmp_path, monkeypatch):
+    scenario = yaml.safe_load((ROOT / "evals/scenarios/01-bad-deploy.yaml").read_text())
+    result = _runbook(scenario, tmp_path, monkeypatch)
+    assert result["report"]["category"] == "bad_deploy"
+    assert result["remediation"]["action"] == "rollback_image"
+    assert result["remediation"]["params"] == {"image": "argus-demo/shop:1.3.2"}
+    # the report must not claim more than was checked: the previous revision's health is not measured
+    assert "healthy" not in result["remediation"]["rationale"]
+
+
+def test_a_password_inside_a_connection_url_is_redacted():
+    g = Guardrails()
+    out = g.sanitize("search_logs", "connect failed: postgres://shop:hunter2@db:5432/shop (timeout)")
+    assert "hunter2" not in out and "postgres://shop:<redacted>@db:5432/shop" in out
+    assert "http://checkout:8080/cart/@me" in g.sanitize("search_logs", "GET http://checkout:8080/cart/@me 200")
+
+
 def test_incident_id_is_stable():
     # The id names the Git branch and the report. It must not change when the hash call is touched.
     alert = {"labels": {"alertname": "HighErrorRate", "service": "frontend", "namespace": "shop", "severity": "page"}}
