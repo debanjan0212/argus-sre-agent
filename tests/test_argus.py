@@ -139,6 +139,50 @@ def test_model_outage_falls_back_to_runbook(monkeypatch):
     }
 
 
+def test_the_github_token_never_appears_in_a_git_command_or_url(monkeypatch, tmp_path):
+    import base64
+
+    from argus import remediation
+
+    token = "tok-for-this-test"
+    monkeypatch.setenv("GITHUB_TOKEN", token)
+    monkeypatch.delenv("GIT_CONFIG_COUNT", raising=False)
+    calls = []
+    monkeypatch.setattr(remediation.subprocess, "run", lambda cmd, **kw: calls.append((cmd, kw)))
+    remediation.clone_gitops("acme/gitops", str(tmp_path / "gitops"))
+    cmd, kw = calls[0]
+    assert cmd == ["git", "clone", "https://github.com/acme/gitops.git", str(tmp_path / "gitops")]
+    assert token not in " ".join(cmd)
+
+    # the token travels as a header for github.com only, through the environment
+    env = kw["env"]
+    assert env["GIT_CONFIG_KEY_0"] == "http.https://github.com/.extraheader"
+    assert base64.b64decode(env["GIT_CONFIG_VALUE_0"].split()[-1]).decode() == "x-access-token:" + token
+    assert env["GIT_TERMINAL_PROMPT"] == "0"
+
+    # real git reads it from the environment, and nothing is written to disk
+    monkeypatch.undo()
+    monkeypatch.setenv("GITHUB_TOKEN", token)
+    monkeypatch.delenv("GIT_CONFIG_COUNT", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    seen = subprocess.run(
+        ["git", "config", "--get", "http.https://github.com/.extraheader"],
+        capture_output=True,
+        text=True,
+        env=remediation.git_env(),
+    )
+    assert seen.stdout.startswith("AUTHORIZATION: basic ")
+    assert not (tmp_path / ".gitconfig").exists()
+
+
+def test_git_runs_without_a_token_too(monkeypatch):
+    from argus import remediation
+
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    monkeypatch.delenv("GIT_CONFIG_COUNT", raising=False)
+    assert "GIT_CONFIG_COUNT" not in remediation.git_env()
+
+
 def test_incident_id_is_stable():
     # The id names the Git branch and the report. It must not change when the hash call is touched.
     alert = {"labels": {"alertname": "HighErrorRate", "service": "frontend", "namespace": "shop", "severity": "page"}}
