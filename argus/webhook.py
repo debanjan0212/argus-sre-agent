@@ -11,7 +11,6 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import subprocess
 import threading
 import time
 import urllib.request
@@ -22,7 +21,7 @@ from argus.agent import investigate, to_markdown
 from argus.guardrails import Guardrails
 from argus.llm import load_llm
 from argus.net import open_http
-from argus.remediation import propose_change
+from argus.remediation import clone_gitops, propose_change
 
 DEDUPE_SECONDS = int(os.getenv("ARGUS_DEDUPE_SECONDS", "1800"))
 reports: OrderedDict[str, dict] = OrderedDict()
@@ -104,7 +103,7 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     repo, token, gitops = os.getenv("ARGUS_GITHUB_REPO"), os.getenv("GITHUB_TOKEN"), os.getenv("ARGUS_GITOPS_DIR")
     if repo and token and gitops and not os.path.isdir(gitops):  # in-cluster: clone the GitOps repo once
-        subprocess.run(["git", "clone", f"https://x-access-token:{token}@github.com/{repo}.git", gitops], check=True)
+        clone_gitops(repo, gitops)
     port = int(os.getenv("ARGUS_PORT", "8080"))
     # All interfaces by default: this runs in a pod and Alertmanager reaches it through the Service.
     # Set ARGUS_HOST=127.0.0.1 to keep it local.

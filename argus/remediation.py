@@ -4,6 +4,7 @@ it edits the manifest in Git, opens a pull request, and a human merges it (Argo 
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import subprocess
@@ -44,8 +45,31 @@ def apply_to_manifest(result: dict, repo_dir: str) -> Path | None:
     return path
 
 
+def git_env() -> dict[str, str]:
+    """The environment git runs in. With GITHUB_TOKEN set, the token is sent as an HTTP header, to
+    github.com only. It is handed to git through the environment, so it is never part of a URL, of the
+    command line (visible in `ps` and in error messages) or of .git/config on disk.
+    """
+    env = dict(os.environ)
+    token = os.getenv("GITHUB_TOKEN")
+    if token:
+        basic = base64.b64encode(f"x-access-token:{token}".encode()).decode()
+        n = int(env.get("GIT_CONFIG_COUNT", "0"))
+        env[f"GIT_CONFIG_KEY_{n}"] = "http.https://github.com/.extraheader"
+        env[f"GIT_CONFIG_VALUE_{n}"] = f"AUTHORIZATION: basic {basic}"
+        env["GIT_CONFIG_COUNT"] = str(n + 1)
+        env["GIT_TERMINAL_PROMPT"] = "0"  # fail instead of waiting for a password nobody will type
+    return env
+
+
+def clone_gitops(repo: str, dest: str) -> None:
+    """Clone the GitOps repo (owner/name on GitHub) into dest. The remote URL carries no credentials."""
+    subprocess.run(["git", "clone", f"https://github.com/{repo}.git", dest], check=True, env=git_env())
+
+
 def _git(repo: str, *args: str) -> str:
-    return subprocess.run(["git", "-C", repo, *args], check=True, capture_output=True, text=True).stdout.strip()
+    done = subprocess.run(["git", "-C", repo, *args], check=True, capture_output=True, text=True, env=git_env())
+    return done.stdout.strip()
 
 
 def propose_change(result: dict, repo_dir: str) -> dict:
