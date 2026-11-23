@@ -4,12 +4,24 @@ updates:
     directories: ["/", "/demo/shop"]
     schedule:
       interval: weekly
+    # Raise a minimum version only when the current range does not already allow the new release.
+    versioning-strategy: increase-if-necessary
+    # Propose a release only after it has been public for a week. Security updates are not delayed.
+    cooldown:
+      default-days: 7
   - package-ecosystem: docker
     directories: ["/", "/demo/shop"]
     schedule:
       interval: weekly
-  # keeps the SHA pins in .github/workflows current
+    cooldown:
+      default-days: 7
+  # keeps the SHA pins in .github/workflows current, as one pull request instead of one per action
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]

@@ -26,6 +26,18 @@ jobs:
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
             gitops/ deploy/k8s/
 
+  # The container images may move to a newer Python. This proves the code runs there first.
+  test-py315:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.15"}
+      - run: pip install -e ".[dev]"
+      - run: pytest -q
+      - name: Agent evals (runbook mode, real MCP over stdio)
+        run: python -m argus eval
+
   images:
     runs-on: ubuntu-latest
     steps:
