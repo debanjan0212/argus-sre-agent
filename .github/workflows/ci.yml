@@ -7,15 +7,15 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with: {python-version: "3.12"}
       - run: pip install -e ".[dev]"
       - run: ruff check .
       - run: pytest -q
       - name: Agent evals (runbook mode, real MCP over stdio)
         run: python -m argus eval --out eval-results.json >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with: {name: eval-results, path: eval-results.json}
       - name: Validate manifests against Kubernetes + CRD schemas
@@ -30,8 +30,8 @@ jobs:
   test-py315:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with: {python-version: "3.15"}
       - run: pip install -e ".[dev]"
       - run: pytest -q
@@ -41,6 +41,6 @@ jobs:
   images:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: docker build -t argus-demo/argus:ci .
       - run: docker build -t argus-demo/shop:ci demo/shop
