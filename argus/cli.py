@@ -28,6 +28,9 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("serve", help="run the Alertmanager webhook receiver")
     sub.add_parser("mcp", help="run the bundled observability MCP server (stdio)")
     args = p.parse_args(argv)
+    from argus.telemetry import setup
+
+    setup()  # only does something when OTEL_EXPORTER_OTLP_ENDPOINT is set
 
     if args.cmd == "eval":
         from argus.evals import run

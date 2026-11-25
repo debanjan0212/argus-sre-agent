@@ -155,6 +155,24 @@ Create an incoming webhook in Slack or Google Chat and set `ARGUS_NOTIFY_WEBHOOK
 | `ARGUS_AUDIT_LOG` | | file path for the JSONL audit log of every tool call |
 | `ARGUS_PORT`, `ARGUS_HOST` | `8080`, `0.0.0.0` | HTTP port and address for the webhook, `/reports` and `/metrics`. Set `ARGUS_HOST=127.0.0.1` to keep it local. |
 | `ARGUS_MCP_PORT`, `ARGUS_MCP_HOST` | `8765`, `127.0.0.1` | where `argus-mcp --http` listens. It is local-only unless you set `ARGUS_MCP_HOST=0.0.0.0`. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS` | | send a trace of each investigation (see below). Off when unset |
+
+### Watch Argus itself
+
+Argus is an agent too, so it can be put under an error budget like any other. Set the standard OpenTelemetry
+variables and each investigation becomes one trace in the GenAI conventions: an `invoke_agent argus` span with the
+incident id as its session, a `chat` span per model turn with its token counts (an outage is an error; the
+runbook is not reported as a model), and an `execute_tool` span per MCP call, marked denied when the guardrails
+refused it. Prompts, tool arguments and tool output are never recorded.
+
+```bash
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:8600            # Themis, or any OTLP/HTTP backend
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer%20<ingest key>"
+argus investigate --scenario evals/scenarios/02-oom-kill.yaml
+```
+
+[Themis](https://github.com/debanjan0212/themis-agent-sre) reads these traces, and sends Argus its incidents
+through `/alertmanager`.
 
 ### Use its MCP server from Claude, Cursor or any MCP client
 
