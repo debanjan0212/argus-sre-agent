@@ -28,6 +28,7 @@ class ToolCall:
 class Reply:
     content: str | None
     tool_calls: list[ToolCall] = field(default_factory=list)
+    usage: dict = field(default_factory=dict)  # prompt_tokens and completion_tokens, when the provider says
 
 
 class OpenAICompatLLM:
@@ -49,12 +50,13 @@ class OpenAICompatLLM:
         body = {"model": self.model, "messages": messages, "temperature": 0}
         if tools:
             body["tools"] = tools
-        msg = (await asyncio.to_thread(self._post, body))["choices"][0]["message"]
+        response = await asyncio.to_thread(self._post, body)
+        msg = response["choices"][0]["message"]
         calls = [
             ToolCall(c["id"], c["function"]["name"], json.loads(c["function"]["arguments"] or "{}"))
             for c in msg.get("tool_calls") or []
         ]
-        return Reply(msg.get("content"), calls)
+        return Reply(msg.get("content"), calls, response.get("usage") or {})
 
 
 class RunbookLLM:

@@ -11,7 +11,9 @@ from contextlib import AsyncExitStack
 from pathlib import Path
 
 from mcp import Client, StdioServerParameters
+from opentelemetry import trace
 
+from argus import telemetry
 from argus.guardrails import Guardrails, GuardrailViolation
 from argus.llm import RunbookLLM
 
@@ -68,6 +70,15 @@ def incident_id(alert: dict) -> str:
 
 
 async def investigate(alert: dict, llm, guard: Guardrails, servers: list | None = None) -> dict:
+    """One investigation, as one trace when OpenTelemetry is set up (see argus/telemetry.py)."""
+    with telemetry.investigation(incident_id(alert), alert.get("labels", {}).get("alertname", "alert")) as span:
+        result = await _investigate(alert, llm, guard, servers)
+        span.set_attribute("argus.mode", result["mode"])
+        span.set_attribute("argus.remediation", str(result["remediation"].get("action")))
+        return result
+
+
+async def _investigate(alert: dict, llm, guard: Guardrails, servers: list | None = None) -> dict:
     started, mode = time.monotonic(), llm.name
     async with AsyncExitStack() as stack:
         route, tools = {}, []
@@ -91,7 +102,16 @@ async def investigate(alert: dict, llm, guard: Guardrails, servers: list | None 
         while steps < guard.policy.max_steps and report is None:
             steps += 1
             try:
-                reply = await llm.complete(messages, schema)
+                if isinstance(llm, RunbookLLM):  # rules, not a model: nothing to report as a model call
+                    reply = await llm.complete(messages, schema)
+                else:
+                    with telemetry.model_call(llm.name, getattr(llm, "model", llm.name)) as span:
+                        try:
+                            reply = await llm.complete(messages, schema)
+                        except Exception as exc:
+                            telemetry.failed(span, exc)
+                            raise
+                        telemetry.record_usage(span, getattr(reply, "usage", {}))
             except Exception as exc:
                 if isinstance(llm, RunbookLLM):
                     raise
@@ -119,16 +139,20 @@ async def investigate(alert: dict, llm, guard: Guardrails, servers: list | None 
                 }
             )
             for call in reply.tool_calls:
-                try:
-                    guard.check_call(call.name)
-                    result = await route[call.name].call_tool(call.name, call.arguments)
-                    text = guard.sanitize(call.name, "\n".join(getattr(c, "text", "") for c in result.content))
-                except GuardrailViolation as exc:
-                    text = f"BLOCKED by Argus guardrails: {exc}"
+                with telemetry.tool_call(call.name) as span:
+                    try:
+                        guard.check_call(call.name)
+                        result = await route[call.name].call_tool(call.name, call.arguments)
+                        text = guard.sanitize(call.name, "\n".join(getattr(c, "text", "") for c in result.content))
+                    except GuardrailViolation as exc:
+                        span.set_attribute("themis.gate.decision", "deny")  # the model asked for a tool it may not use
+                        telemetry.failed(span, exc, "policy_denied")
+                        text = f"BLOCKED by Argus guardrails: {exc}"
                 guard.audit("tool_call", tool=call.name, args=call.arguments, chars=len(text))
                 messages.append({"role": "tool", "tool_call_id": call.id, "content": text})
 
         if report is None:
+            telemetry.failed(trace.get_current_span(), "investigation ran out of budget", "budget_exhausted")
             report = {
                 "summary": "investigation ran out of budget",
                 "category": "unknown",
